@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import "./style.css"; // css file for styling
 
 function Login() {
@@ -29,6 +30,10 @@ function Login() {
                     />
                     <button type="submit">Login</button>
                 </form>
+                {/* Link to Forgot Password */}
+      <Link to="/forgot-password" style={{ color: "blue", cursor: "pointer" }}>
+        Forgot your password?
+      </Link>
             </div>
         </div>
     );
