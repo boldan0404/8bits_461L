@@ -37,7 +37,8 @@ def login():
 
     print(f"Username: {username}, Password: {password}")  # Print received values
     # check the data
-    user = db.user.find_one({"username": username})
+    user = db.users.find_one({"username": username})
+    print(user)
     if user:
         if user['password'] == password:
             return jsonify({"message": "Login successful"}), 200
