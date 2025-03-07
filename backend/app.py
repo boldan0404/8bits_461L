@@ -48,5 +48,25 @@ def login():
     else:
         return jsonify({"error": "User not found"}), 404
 
+@app.route("/register",methods=["POST"])
+def register():
+    data = request.get_json()
+
+    if not data or not data.get('username') or not data.get('password'):
+        return jsonify({"error": "Missing email or password"}), 400
+    
+    # parse the data
+    username = data['username']
+    password = data['password']
+
+    # check if the user already exists
+    if db.users.find_one({"username":username}):
+        return jsonify({"error": "User already exists"}), 401
+    
+    # insert the user
+    db.users.insert_one({"username":
+    username, "password": password})
+    return jsonify({"message": "User registered successfully"}), 200
+ 
 if __name__ == "__main__":
     app.run(debug=True)
