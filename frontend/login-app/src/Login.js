@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import {Link, useNavigate} from "react-router-dom";
 import "./style.css"; // css file for styling
 import axios from "axios"; // Import axios for HTTP requests
 
@@ -7,6 +7,7 @@ function Login() {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [message, setMessage] = useState("");
+    const navigate = useNavigate();
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -18,6 +19,7 @@ function Login() {
 
             setMessage(response.data.message);
             console.log("Login successful:", response.data);
+            navigate("/projects");
         } catch (error) {
             if (error.response) {
                 setMessage(error.response.data.error);
