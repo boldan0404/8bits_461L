@@ -20,7 +20,7 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
     const [quantity, setQuantity] = useState(0);
     const [selectedHardwareSet, setSelectedHardwareSet] = useState(0); // default selection is the first hardware set
     const token = localStorage.getItem('token');
-
+    console.log(name);
     const handleQuantityChange = (e) => {
         setQuantity(Number(e.target.value));
     };
