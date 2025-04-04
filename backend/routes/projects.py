@@ -88,6 +88,7 @@ def checkin_hardware(name,setname):
 @projects.route("/projects/<name>/hwsets/<set_name>/checkout", methods=["POST"])
 @jwt_required()
 def checkout_hw(name, set_name):
+    db = current_app.db()
     data = request.get_json()
     qty = data.get("qty", 0)
     username = get_jwt_identity()

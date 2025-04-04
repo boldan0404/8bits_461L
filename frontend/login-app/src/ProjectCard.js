@@ -29,11 +29,23 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
     };
 
     const handleCheckIn = async () => {
-        const url = `${API_BASE_URL}/checkin?projectId=${id}&qty=${quantity}`;
+        const projectName = name;
+        const hwSetName = hardwareSets[selectedHardwareSet].split(':')[0]; // extract hardware set name
+        const url = `${API_BASE_URL}/projects/${projectName}/hwsets/${hwSetName}/checkin`;
         try {
-            const response = await fetch(url);
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                },
+                body: JSON.stringify({
+                    hardware_sets: hardwareSets,
+                    qty: quantity,
+                })
+            });
             const data = await response.json();
-            alert(data.message); // Pop-up: "<qty> hardware checked in"
+            alert(data.message);
             onCheckIn(id, selectedHardwareSet, quantity);
         } catch (error) {
             console.error("Error checking in hardware:", error);
@@ -41,11 +53,22 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
     };
 
     const handleCheckOut = async () => {
-        const url = `${API_BASE_URL}/checkout?projectId=${id}&qty=${quantity}`;
+        const projectName = name;
+        const hwSetName = hardwareSets[selectedHardwareSet].split(':')[0];
+        const url = `${API_BASE_URL}/projects/${projectName}/hwsets/${hwSetName}/checkout`;
         try {
-            const response = await fetch(url);
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                },
+                body: JSON.stringify({
+                    qty: quantity,
+                })
+            });
             const data = await response.json();
-            alert(data.message); // Pop-up: "<qty> hardware checked out"
+            alert(data.message);
             onCheckOut(id, selectedHardwareSet, quantity);
         } catch (error) {
             console.error("Error checking out hardware:", error);
@@ -53,12 +76,18 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
     };
 
     const handleJoinLeave = async () => {
+        const projectName = name;
         const endpoint = joined ? 'leave' : 'join';
-        const url = `${API_BASE_URL}/${endpoint}?projectId=${id}`;
+        const url = `${API_BASE_URL}/projects/${projectName}/${endpoint}`;
         try {
-            const response = await fetch(url);
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                },
+            });
             const data = await response.json();
-            alert(data.message); // Pop-up: "Joined <projectId>" or "Left <projectId>"
+            alert(data.message);
             onToggleJoin(id);
         } catch (error) {
             console.error(`Error trying to ${joined ? 'leave' : 'join'} project:`, error);
@@ -82,7 +111,6 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
                         onChange={handleHardwareSetChange}
                     >
                         {hardwareSets.map((set, index) => {
-                            // Extract the label before the colon, e.g., "HWSet1"
                             const label = set.split(':')[0];
                             return (
                                 <MenuItem key={index} value={index}>

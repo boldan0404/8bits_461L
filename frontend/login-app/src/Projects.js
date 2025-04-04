@@ -1,35 +1,76 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ProjectCard from './ProjectCard';
 
+const API_BASE_URL = "http://localhost:5000";
+
 function Projects() {
-    const [projects, setProjects] = useState([
-        {
-            id: 1,
-            name: 'Project Name 1',
-            hardwareSets: ['HWSet1: 50/100', 'HWSet2: 0/100'],
-            authorizedUsers: ['User1', 'User2'],
-            joined: false
-        },
-        {
-            id: 2,
-            name: 'Project Name 2',
-            hardwareSets: ['HWSet1: 25/100'],
-            authorizedUsers: ['User1', 'User3'],
-            joined: true
+    const [projects, setProjects] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    // Fetch projects from your Flask backend on mount
+    useEffect(() => {
+        async function fetchProjects() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/projects`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`, // JWT token if required
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch projects');
+                }
+
+                // The backend returns an array of project documents
+                const data = await response.json();
+
+                // Transform each project to match what your UI expects
+                const username = localStorage.getItem('username'); // if you store the logged-in username
+                const transformedProjects = data.map((project, index) => {
+                    // Convert hardware_sets object to an array of strings
+                    // e.g. { HWSet1: { available: 50, capacity: 100 }, HWSet2: {...} }
+                    // => ["HWSet1: 50/100", "HWSet2: 0/100"]
+                    let hardwareSets = [];
+                    if (project.hardware_sets) {
+                        hardwareSets = Object.entries(project.hardware_sets).map(([setName, setData]) => {
+                            const { available, capacity } = setData;
+                            return `${setName}: ${available}/${capacity}`;
+                        });
+                    }
+
+                    return {
+                        // Use project._id or project.name or something else as a unique ID
+                        id: project._id?.$oid || index,
+                        name: project.name,
+                        hardwareSets: hardwareSets,
+                        authorizedUsers: project.authorized_users || [],
+                        // If you want to mark "joined" based on whether the current user is in authorized_users
+                        joined: (project.authorized_users || []).includes(username),
+                    };
+                });
+
+                setProjects(transformedProjects);
+            } catch (err) {
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
         }
-    ]);
+
+        fetchProjects();
+    }, []);
 
     const handleToggleJoin = (projectId) => {
-        setProjects((prevProjects) =>
-            prevProjects.map((project) =>
-                project.id === projectId
-                    ? { ...project, joined: !project.joined }
-                    : project
+        setProjects(prevProjects =>
+            prevProjects.map(proj =>
+                proj.id === projectId ? { ...proj, joined: !proj.joined } : proj
             )
         );
     };
 
-    // Update only the selected hardware set for the given project.
+    // This updates the hardwareSets array in local state after check-in/check-out
     const handleHardwareUpdate = (projectId, hardwareSetIndex, qty, type) => {
         setProjects(prevProjects =>
             prevProjects.map(project => {
@@ -38,7 +79,7 @@ function Projects() {
                 const updatedHardwareSets = project.hardwareSets.map((setString, index) => {
                     if (index !== hardwareSetIndex) return setString;
 
-                    // Assuming format "HWSet1: current/total"
+                    // "HWSet1: 50/100" => label="HWSet1", numbers="50/100"
                     const [label, numbers] = setString.split(':').map(s => s.trim());
                     let [current, total] = numbers.split('/').map(Number);
 
@@ -55,6 +96,13 @@ function Projects() {
             })
         );
     };
+
+    if (loading) {
+        return <div>Loading projects...</div>;
+    }
+    if (error) {
+        return <div>Error: {error}</div>;
+    }
 
     return (
         <div>
