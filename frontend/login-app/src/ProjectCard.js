@@ -88,7 +88,7 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
     const handleJoinLeave = async () => {
         const projectName = name;
         const endpoint = joined ? 'leave' : 'join';
-        const url = `${API_BASE_URL}/${endpoint}?projectId=${id}`;
+        const url = `${API_BASE_URL}/projects/${projectName}/${endpoint}`;
         try {
             const response = await fetch(url, {
                 method: 'POST',
