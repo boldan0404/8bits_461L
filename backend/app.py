@@ -3,8 +3,9 @@ from flask_cors import CORS
 from flask_pymongo import PyMongo
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, jwt_required, JWTManager
+import os
 
-app = Flask(__name__)
+app = Flask(__name__,  static_folder='./build', static_url_path='/')
 app.config["secret_key"] = "ee80e69581676bd475d118d83c238748435e7cbe"
 app.config["MONGO_URI"] = "mongodb+srv://bits8ece461l:SWELab#2025@8bits-461l.hlqqd.mongodb.net" \
 "/8bit_db?retryWrites=true&w=majority&appName=8bits-461L"
@@ -15,6 +16,14 @@ CORS(app)
 mongo = PyMongo(app)
 db = mongo.db
 jwt = JWTManager(app)
+
+@app.route('/')
+def index():
+    return app.send_static_file('index.html')
+
+@app.errorhandler(404)
+def not_found(e):
+    return app.send_static_file('index.html')
 
 @app.route("/test-mongo", methods=["GET"])
 def test_mongo():
@@ -124,4 +133,4 @@ def leaveProject():
     })
  
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host='0.0.0.0', debug=False, port=os.environ.get('PORT', 80))
