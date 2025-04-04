@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ProjectCard from './ProjectCard';
 
-const API_BASE_URL = "http://localhost:5000";
+const API_BASE_URL = "http://127.0.0.1:5000";
 
 function Projects() {
     const [projects, setProjects] = useState([]);

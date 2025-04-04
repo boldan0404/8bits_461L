@@ -13,12 +13,13 @@ import {
 } from '@mui/material';
 
 // Update this base URL to match your Flask deployment (or localhost for testing)
-const API_BASE_URL = "http://localhost:5000";
+const API_BASE_URL = "http://127.0.0.1:5000";
 
 function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
     const { id, name, hardwareSets, joined } = project;
     const [quantity, setQuantity] = useState(0);
     const [selectedHardwareSet, setSelectedHardwareSet] = useState(0); // default selection is the first hardware set
+    const token = localStorage.getItem('token');
 
     const handleQuantityChange = (e) => {
         setQuantity(Number(e.target.value));
@@ -33,6 +34,15 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
         const hwSetName = hardwareSets[selectedHardwareSet].split(':')[0]; // extract hardware set name
         const url = `${API_BASE_URL}/projects/${projectName}/hwsets/${hwSetName}/checkin`;
         try {
+            // const response = await fetch(url, {
+            //     method: "POST",
+            //     headers: {
+            //         "Content-Type": "application/json",
+            //         "Authorization": `Bearer ${token}`
+            //     },
+            //     body: JSON.stringify({ qty: quantity })
+            // });
+
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -78,7 +88,7 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
     const handleJoinLeave = async () => {
         const projectName = name;
         const endpoint = joined ? 'leave' : 'join';
-        const url = `${API_BASE_URL}/projects/${projectName}/${endpoint}`;
+        const url = `${API_BASE_URL}/${endpoint}?projectId=${id}`;
         try {
             const response = await fetch(url, {
                 method: 'POST',

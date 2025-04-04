@@ -16,7 +16,9 @@ function Login() {
                 username: username,
                 password: password
             });
-
+            const { token, message } = response.data;
+            localStorage.setItem("token", token);
+            
             setMessage(response.data.message);
             console.log("Login successful:", response.data);
             navigate("/projects");
