@@ -77,6 +77,51 @@ def register():
     db.users.insert_one({"username":
     username, "password": password})
     return jsonify({"message": "User registered successfully"}), 200
+@app.route('/checkin', methods=['GET'])
+def checkIn_hardware():
+    # Extract parameters from the URL query string
+    projectId = request.args.get('projectId')
+    qty = request.args.get('qty')
+
+    # In a complete solution, you would check hardware availability and update your DB.
+    # For now, simply return the values to the front end.
+    return jsonify({
+        'projectId': projectId,
+        'qty': qty,
+        'message': f"{qty} hardware checked in"
+    })
+
+@app.route('/checkout', methods=['GET'])
+def checkOut_hardware():
+    projectId = request.args.get('projectId')
+    qty = request.args.get('qty')
+
+    # In a complete solution, you would validate that the hardware is available and update your DB.
+    return jsonify({
+        'projectId': projectId,
+        'qty': qty,
+        'message': f"{qty} hardware checked out"
+    })
+
+@app.route('/join', methods=['GET'])
+def joinProject():
+    projectId = request.args.get('projectId')
+
+    # Here you might check if the user is authorized to join the project.
+    return jsonify({
+        'projectId': projectId,
+        'message': f"Joined {projectId}"
+    })
+
+@app.route('/leave', methods=['GET'])
+def leaveProject():
+    projectId = request.args.get('projectId')
+
+    # In a full solution, you would verify the user has joined this project before allowing them to leave.
+    return jsonify({
+        'projectId': projectId,
+        'message': f"Left {projectId}"
+    })
  
 if __name__ == "__main__":
     app.run(debug=True)
