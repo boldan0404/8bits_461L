@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import ProjectCard from './ProjectCard';
+import {
+    Button,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+    Typography
+} from '@mui/material';
+import { Add } from '@mui/icons-material';
 
 const API_BASE_URL = "http://127.0.0.1:5000";
 
@@ -7,6 +17,12 @@ function Projects() {
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+    // State for Create Project dialog
+    const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [projectName, setProjectName] = useState("");
+    const [hwSetName, setHwSetName] = useState("");
+    const [hwSetCapacity, setHwSetCapacity] = useState("");
 
     // Fetch projects from your Flask backend on mount
     useEffect(() => {
@@ -30,8 +46,8 @@ function Projects() {
                 const username = localStorage.getItem('username'); // if you store the logged-in username
                 const transformedProjects = data.map((project, index) => {
                     // Convert hardware_sets object to an array of strings
-                    // e.g. { HWSet1: { available: 50, capacity: 100 }, HWSet2: {...} }
-                    // => ["HWSet1: 50/100", "HWSet2: 0/100"]
+                    // e.g. { HWSet1: { available: 50, capacity: 100 } }
+                    // => ["HWSet1: 50/100"]
                     let hardwareSets = [];
                     if (project.hardware_sets) {
                         hardwareSets = Object.entries(project.hardware_sets).map(([setName, setData]) => {
@@ -46,7 +62,7 @@ function Projects() {
                         name: project.name,
                         hardwareSets: hardwareSets,
                         authorizedUsers: project.authorized_users || [],
-                        // If you want to mark "joined" based on whether the current user is in authorized_users
+                        // Mark "joined" based on whether the current user is in authorized_users
                         joined: (project.authorized_users || []).includes(username),
                     };
                 });
@@ -79,7 +95,7 @@ function Projects() {
                 const updatedHardwareSets = project.hardwareSets.map((setString, index) => {
                     if (index !== hardwareSetIndex) return setString;
 
-                    // "HWSet1: 50/100" => label="HWSet1", numbers="50/100"
+                    // "HWSet1: 50/100" => label = "HWSet1", numbers = "50/100"
                     const [label, numbers] = setString.split(':').map(s => s.trim());
                     let [current, total] = numbers.split('/').map(Number);
 
@@ -97,6 +113,80 @@ function Projects() {
         );
     };
 
+    // --------------- Create Project Dialog Handlers ---------------
+
+    const openCreateDialog = () => {
+        setCreateDialogOpen(true);
+    };
+
+    const closeCreateDialog = () => {
+        setProjectName("");
+        setHwSetName("");
+        setHwSetCapacity("");
+        setCreateDialogOpen(false);
+    };
+
+    const handleCreateProject = async () => {
+        try {
+            // Build hardware_sets object from dialog fields (for one hardware set)
+            const hardwareSets = {};
+            if (hwSetName && hwSetCapacity) {
+                hardwareSets[hwSetName] = {
+                    available: 0,
+                    capacity: parseInt(hwSetCapacity, 10)
+                };
+            }
+
+            const response = await fetch(`${API_BASE_URL}/projects`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    name: projectName,
+                    hardware_sets: hardwareSets
+                })
+            });
+
+            if (!response.ok) {
+                const errMsg = await response.json();
+                throw new Error(errMsg.error || 'Error creating project');
+            }
+
+            // On success, close dialog and refresh the project list
+            closeCreateDialog();
+            const newResponse = await fetch(`${API_BASE_URL}/projects`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+            });
+            const newData = await newResponse.json();
+            const username = localStorage.getItem('username');
+            const transformedProjects = newData.map((project, index) => {
+                let hardwareSets = [];
+                if (project.hardware_sets) {
+                    hardwareSets = Object.entries(project.hardware_sets).map(([setName, setData]) => {
+                        const { available, capacity } = setData;
+                        return `${setName}: ${available}/${capacity}`;
+                    });
+                }
+                return {
+                    id: project._id?.$oid || index,
+                    name: project.name,
+                    hardwareSets: hardwareSets,
+                    authorizedUsers: project.authorized_users || [],
+                    joined: (project.authorized_users || []).includes(username),
+                };
+            });
+            setProjects(transformedProjects);
+        } catch (error) {
+            console.error("Failed to create project:", error);
+            alert(error.message);
+        }
+    };
+
     if (loading) {
         return <div>Loading projects...</div>;
     }
@@ -105,8 +195,10 @@ function Projects() {
     }
 
     return (
-        <div>
-            <h2>Projects</h2>
+        <div style={{ position: 'relative', minHeight: '100vh' }}>
+            <Typography variant="h4" style={{ marginBottom: '16px' }}>
+                Projects
+            </Typography>
             {projects.map((proj) => (
                 <ProjectCard
                     key={proj.id}
@@ -120,6 +212,61 @@ function Projects() {
                     }
                 />
             ))}
+
+            {/* Floating "Create Project" Button */}
+            <Button
+                variant="contained"
+                color="primary"
+                startIcon={<Add />}
+                onClick={openCreateDialog}
+                style={{
+                    position: 'fixed',
+                    bottom: '16px',
+                    right: '16px',
+                    width: 'auto',         // Make sure it doesn't stretch
+                    minWidth: 'auto',
+                    borderRadius: '24px',  // Optional rounding
+                    padding: '8px 16px'    // Optional spacing
+                }}
+            >
+                Create Project
+            </Button>
+
+            {/* Create Project Dialog */}
+            <Dialog open={createDialogOpen} onClose={closeCreateDialog}>
+                <DialogTitle>Create New Project</DialogTitle>
+                <DialogContent sx={{ minWidth: '300px' }}>
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        label="Project Name"
+                        fullWidth
+                        value={projectName}
+                        onChange={(e) => setProjectName(e.target.value)}
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Hardware Set Name"
+                        fullWidth
+                        value={hwSetName}
+                        onChange={(e) => setHwSetName(e.target.value)}
+                    />
+                    <TextField
+                        margin="dense"
+                        label="Hardware Set Capacity"
+                        type="number"
+                        fullWidth
+                        value={hwSetCapacity}
+                        onChange={(e) => setHwSetCapacity(e.target.value)}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeCreateDialog}>Cancel</Button>
+                    <Button onClick={handleCreateProject} variant="contained" color="primary">
+                        Create
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </div>
     );
 }

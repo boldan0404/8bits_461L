@@ -109,3 +109,24 @@ def checkout_hw(name, set_name):
         {"$inc": {f"hardware_sets.{set_name}.available": -qty}}
     )
     return jsonify({"message": f"{qty} units checked out from {set_name}"}), 200
+#temporary backend
+@projects.route("/projects", methods=["POST"])
+@jwt_required()
+def create_project():
+    db = current_app.db
+    data = request.get_json()
+
+    # Basic error checking
+    project_name = data.get('name')
+    hardware_sets = data.get('hardware_sets', {})
+    if not project_name:
+        return jsonify({"error": "Project name is required"}), 400
+
+    # Insert project into MongoDB
+    new_project = {
+        "name": project_name,
+        "hardware_sets": hardware_sets,
+        "authorized_users": []  # Optionally add the creator as authorized
+    }
+    db.projects.insert_one(new_project)
+    return jsonify({"message": f"Project '{project_name}' created successfully"}), 201
