@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import {Link, useNavigate} from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./style.css"; // css file for styling
 import axios from "axios"; // Import axios for HTTP requests
 
@@ -18,7 +18,7 @@ function Login() {
             });
             const { token, message } = response.data;
             localStorage.setItem("token", token);
-            
+
             setMessage(response.data.message);
             console.log("Login successful:", response.data);
             navigate("/projects");
@@ -54,10 +54,10 @@ function Login() {
                 </form>
                 {message && <p>{message}</p>}
                 {/* Link to Forgot Password */}
-                <Link to="/forgot-password" style={{color: "blue", cursor: "pointer"}}>
+                <Link to="/forgot-password" style={{ color: "blue", cursor: "pointer" }}>
                     Forgot your password?
                 </Link>
-                <br/>
+                <br />
                 {/* Button to New User Registration Page */}
                 <Link to="/new-user">
                     <button className="new-user-button">New User? Register Here</button>

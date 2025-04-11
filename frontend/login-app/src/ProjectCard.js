@@ -64,6 +64,7 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
 
     const handleCheckOut = async () => {
         const projectName = name;
+        console.log("checkout project name:", projectName);
         const hwSetName = hardwareSets[selectedHardwareSet].split(':')[0];
         const url = `${API_BASE_URL}/projects/${projectName}/hwsets/${hwSetName}/checkout`;
         try {

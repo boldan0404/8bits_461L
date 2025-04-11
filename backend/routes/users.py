@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token
 
-users = Blueprint('users', __name__)  # ✅ name it correctly
+users = Blueprint('users', __name__)  
 
 @users.route("/login", methods=["POST"])
 def login():

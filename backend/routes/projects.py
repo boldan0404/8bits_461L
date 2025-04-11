@@ -1,9 +1,20 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from bson import ObjectId
 
 projects = Blueprint('projects', __name__)
 
-# query for a list of all projects
+# Helper to validate project and authorization
+def get_project_and_validate(name, username):
+    db = current_app.db
+    project = db.projects.find_one({"name": name})
+    if not project:
+        return None, jsonify({"error": "Project not found"}), 404
+    if username not in project.get("authorized_users", []):
+        return None, jsonify({"error": "User not authorized"}), 403
+    return project, None, None
+
+# GET all projects
 @projects.route("/projects", methods=["GET"])
 @jwt_required()
 def get_projects():
@@ -11,7 +22,7 @@ def get_projects():
     projects = list(db.projects.find({}, {"_id": 0}))
     return jsonify(projects), 200
 
-# query for a specific project
+# GET single project
 @projects.route("/projects/<name>", methods=["GET"])
 @jwt_required()
 def get_project(name):
@@ -21,7 +32,7 @@ def get_project(name):
         return jsonify({"error": "Project not found"}), 404
     return jsonify(project), 200
 
-# query for join in a specific project
+# POST join project
 @projects.route("/projects/<name>/join", methods=["POST"])
 @jwt_required()
 def join_project(name):
@@ -35,7 +46,7 @@ def join_project(name):
         return jsonify({"message": "Already in project or project not found"}), 200
     return jsonify({"message": f"{username} joined {name}"}), 200
 
-# query for leave a specific project
+# POST leave project
 @projects.route("/projects/<name>/leave", methods=["POST"])
 @jwt_required()
 def leave_project(name):
@@ -47,97 +58,96 @@ def leave_project(name):
     )
     return jsonify({"message": f"{username} left {name}"}), 200
 
-# query for check in hardware in a specific project in specifc hwset set
-@projects.route("/projects/<name>/hwsets/<setname>/checkin", methods=["POST"])
-@jwt_required()
-def checkin_hardware(name,setname):
-    db = current_app.db
-
-    data = request.get_json()
-    if not data or not data.get('hardware_sets'):
-        return jsonify({"error": "Missing hardware"}), 400
-    
-    qty = data.get('qty',0)
-    username = get_jwt_identity()
-    # sending data [project1, hwset1,checkin 3]
-    # so i need to parse this and update the db
-
-    # db.findone return a document project
-    project = db.projects.find_one({"name": name})
-    # check if the project exists
-    if not project:
-        return jsonify({"error": "Project not found"}), 404
-
-   # check if the user is authorized to check in hardware
-    if username not in project.get('authorized_users', []):
-        return jsonify(
-            {"error": "User not authorized",
-             "message": f"User: {username} is not authorized to modify sets from project: {project}"}), 403
-
-    # check if the hardware set exists
-    hwset = project["hardware_sets"].get(setname)
-    if not hwset:
-        return jsonify({"error": "Hardware set not found"}), 404
-    # check if exceed capacity
-    if hwset["available"] + qty > hwset["capacity"]:
-        return jsonify(
-            {"error" : "Exceeds capacity",
-             "message" : f"Attempted to check in too many from set: {setname}"}), 400
-    # update the hardware set
-    db.projects.update_one(
-        {"name": name},
-        {"$inc": {f"hardware_sets.{setname}.available": qty}}
-    )
-
-    return jsonify({
-        "success" : "Transaction successfully completed",
-        "message" : f"{username} checked in {qty} from set: {setname}"}), 200
-
-@projects.route("/projects/<name>/hwsets/<set_name>/checkout", methods=["POST"])
-@jwt_required()
-def checkout_hw(name, set_name):
-    db = current_app.db
-    data = request.get_json()
-    qty = data.get("qty", 0)
-    username = get_jwt_identity()
-
-    project = db.projects.find_one({"name": name})
-    if not project:
-        return jsonify({"error": "Project not found"}), 404
-
-    if username not in project.get("authorized_users", []):
-        return jsonify({"error": "Unauthorized",
-                        "message" : f"User: {username} is not authorized to modify sets from project: {project}"}), 403
-
-    hwset = project["hardware_sets"].get(set_name)
-    if not hwset or hwset["available"] < qty:
-        return jsonify({"error": "Not enough hardware available",
-                        "message" : f"Attempted to checkout too many from set: {set_name}"}), 400
-
-    db.projects.update_one(
-        {"name": name},
-        {"$inc": {f"hardware_sets.{set_name}.available": -qty}}
-    )
-    return jsonify({"message": f"{qty} units checked out from {set_name}"}), 200
-
-#temporary backend
+# POST create project
 @projects.route("/projects", methods=["POST"])
 @jwt_required()
 def create_project():
     db = current_app.db
     data = request.get_json()
 
-    # Basic error checking
     project_name = data.get('name')
-    hardware_sets = data.get('hardware_sets', {})
-    if not project_name:
-        return jsonify({"error": "Project name is required"}), 400
+    hwsets_input = data.get('hwsets', [])
+    username = get_jwt_identity()
 
-    # Insert project into MongoDB
+    if not project_name or not isinstance(hwsets_input, list):
+        return jsonify({"error": "Invalid project data"}), 400
+
+    hwsets = []
+    for hw in hwsets_input:
+        try:
+            hwsets.append({
+                "hwset_id": ObjectId(hw["hwset_id"]),
+                "quantity": int(hw.get("quantity", 0))
+            })
+        except Exception as e:
+            return jsonify({"error": f"Invalid hwset reference: {str(e)}"}), 400
+
     new_project = {
         "name": project_name,
-        "hardware_sets": hardware_sets,
-        "authorized_users": []  # Optionally add the creator as authorized
+        "hwsets": hwsets,
+        "authorized_users": [username],
+        "description": data.get("description", "")
     }
+
     db.projects.insert_one(new_project)
-    return jsonify({"message": f"Project '{project_name}' created successfully"}), 201
+    return jsonify({"message": f"Project '{project_name}' created"}), 201
+
+# POST check in hardware
+@projects.route("/projects/<name>/hwsets/<hwset_id>/checkin", methods=["POST"])
+@jwt_required()
+def checkin_hardware(name, hwset_id):
+    db = current_app.db
+    data = request.get_json()
+    qty = int(data.get("qty", 0))
+    username = get_jwt_identity()
+
+    hwset_oid = ObjectId(hwset_id)
+    project, err, code = get_project_and_validate(name, username)
+    if err: return err, code
+
+    hw_entry = next((h for h in project["hwsets"] if h["hwset_id"] == hwset_oid), None)
+    if not hw_entry:
+        return jsonify({"error": "HWSet not assigned to project"}), 404
+
+    db.projects.update_one(
+        {"name": name, "hwsets.hwset_id": hwset_oid},
+        {"$inc": {"hwsets.$.quantity": qty}}
+    )
+    db.hwsets.update_one(
+        {"_id": hwset_oid},
+        {"$inc": {"available": qty}}
+    )
+
+    return jsonify({"message": f"{qty} units checked in to HWSet {hwset_id}"}), 200
+
+# POST check out hardware
+@projects.route("/projects/<name>/hwsets/<hwset_id>/checkout", methods=["POST"])
+@jwt_required()
+def checkout_hardware(name, hwset_id):
+    db = current_app.db
+    data = request.get_json()
+    qty = int(data.get("qty", 0))
+    username = get_jwt_identity()
+
+    hwset_oid = ObjectId(hwset_id)
+    project, err, code = get_project_and_validate(name, username)
+    if err: return err, code
+
+    hw_entry = next((h for h in project["hwsets"] if h["hwset_id"] == hwset_oid), None)
+    if not hw_entry or hw_entry["quantity"] < qty:
+        return jsonify({"error": "Not enough hardware assigned to project"}), 400
+
+    hwset_global = db.hwsets.find_one({"_id": hwset_oid})
+    if not hwset_global or hwset_global.get("available", 0) < qty:
+        return jsonify({"error": "Not enough hardware available in global pool"}), 400
+
+    db.projects.update_one(
+        {"name": name, "hwsets.hwset_id": hwset_oid},
+        {"$inc": {"hwsets.$.quantity": -qty}}
+    )
+    db.hwsets.update_one(
+        {"_id": hwset_oid},
+        {"$inc": {"available": -qty}}
+    )
+
+    return jsonify({"message": f"{qty} units checked out from HWSet {hwset_id}"}), 200
