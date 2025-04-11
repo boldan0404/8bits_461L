@@ -70,7 +70,9 @@ def checkin_hardware(name,setname):
 
    # check if the user is authorized to check in hardware
     if username not in project.get('authorized_users', []):
-        return jsonify({"error": "User not authorized"}), 403
+        return jsonify(
+            {"error": "User not authorized",
+             "message": f"User: {username} is not authorized to modify sets from project: {project}"}), 403
 
     # check if the hardware set exists
     hwset = project["hardware_sets"].get(setname)
@@ -78,12 +80,18 @@ def checkin_hardware(name,setname):
         return jsonify({"error": "Hardware set not found"}), 404
     # check if exceed capacity
     if hwset["available"] + qty > hwset["capacity"]:
-        return jsonify({"error": "Exceeds capacity"}), 400
+        return jsonify(
+            {"error" : "Exceeds capacity",
+             "message" : f"Attempted to check in too many from set: {setname}"}), 400
     # update the hardware set
     db.projects.update_one(
         {"name": name},
         {"$inc": {f"hardware_sets.{setname}.available": qty}}
     )
+
+    return jsonify({
+        "success" : "Transaction successfully completed",
+        "message" : f"{username} checked in {qty} from set: {setname}"}), 200
 
 @projects.route("/projects/<name>/hwsets/<set_name>/checkout", methods=["POST"])
 @jwt_required()
@@ -98,17 +106,20 @@ def checkout_hw(name, set_name):
         return jsonify({"error": "Project not found"}), 404
 
     if username not in project.get("authorized_users", []):
-        return jsonify({"error": "Unauthorized"}), 403
+        return jsonify({"error": "Unauthorized",
+                        "message" : f"User: {username} is not authorized to modify sets from project: {project}"}), 403
 
     hwset = project["hardware_sets"].get(set_name)
     if not hwset or hwset["available"] < qty:
-        return jsonify({"error": "Not enough hardware available"}), 400
+        return jsonify({"error": "Not enough hardware available",
+                        "message" : f"Attempted to checkout too many from set: {hwset}"}), 400
 
     db.projects.update_one(
         {"name": name},
         {"$inc": {f"hardware_sets.{set_name}.available": -qty}}
     )
     return jsonify({"message": f"{qty} units checked out from {set_name}"}), 200
+
 #temporary backend
 @projects.route("/projects", methods=["POST"])
 @jwt_required()
