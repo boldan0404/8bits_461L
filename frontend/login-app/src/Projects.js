@@ -45,9 +45,6 @@ function Projects() {
                 // Transform each project to match what your UI expects
                 const username = localStorage.getItem('username'); // if you store the logged-in username
                 const transformedProjects = data.map((project, index) => {
-                    // Convert hardware_sets object to an array of strings
-                    // e.g. { HWSet1: { available: 50, capacity: 100 } }
-                    // => ["HWSet1: 50/100"]
                     let hardwareSets = [];
                     if (project.hardware_sets) {
                         hardwareSets = Object.entries(project.hardware_sets).map(([setName, setData]) => {
@@ -57,12 +54,10 @@ function Projects() {
                     }
 
                     return {
-                        // Use project._id or project.name or something else as a unique ID
                         id: project._id?.$oid || index,
                         name: project.name,
                         hardwareSets: hardwareSets,
                         authorizedUsers: project.authorized_users || [],
-                        // Mark "joined" based on whether the current user is in authorized_users
                         joined: (project.authorized_users || []).includes(username),
                     };
                 });
@@ -94,17 +89,13 @@ function Projects() {
 
                 const updatedHardwareSets = project.hardwareSets.map((setString, index) => {
                     if (index !== hardwareSetIndex) return setString;
-
-                    // "HWSet1: 50/100" => label = "HWSet1", numbers = "50/100"
                     const [label, numbers] = setString.split(':').map(s => s.trim());
                     let [current, total] = numbers.split('/').map(Number);
-
                     if (type === 'checkin') {
                         current = Math.min(total, current + qty);
                     } else if (type === 'checkout') {
                         current = Math.max(0, current - qty);
                     }
-
                     return `${label}: ${current}/${total}`;
                 });
 
@@ -114,7 +105,6 @@ function Projects() {
     };
 
     // --------------- Create Project Dialog Handlers ---------------
-
     const openCreateDialog = () => {
         setCreateDialogOpen(true);
     };
@@ -187,6 +177,15 @@ function Projects() {
         }
     };
 
+    // --------------- Log Out Handler ---------------
+    const handleLogout = () => {
+        // Remove token and username from local storage
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        // Redirect to homepage
+        window.location.href = '/';
+    };
+
     if (loading) {
         return <div>Loading projects...</div>;
     }
@@ -213,7 +212,7 @@ function Projects() {
                 />
             ))}
 
-            {/* Floating "Create Project" Button */}
+            {/* Floating "Create Project" Button (Bottom Right) */}
             <Button
                 variant="contained"
                 color="primary"
@@ -223,13 +222,31 @@ function Projects() {
                     position: 'fixed',
                     bottom: '16px',
                     right: '16px',
-                    width: 'auto',         // Make sure it doesn't stretch
+                    width: 'auto',
                     minWidth: 'auto',
-                    borderRadius: '24px',  // Optional rounding
-                    padding: '8px 16px'    // Optional spacing
+                    borderRadius: '24px',
+                    padding: '8px 16px'
                 }}
             >
                 Create Project
+            </Button>
+
+            {/* Floating "Log Out" Button (Bottom Left) */}
+            <Button
+                variant="contained"
+                color="secondary"
+                onClick={handleLogout}
+                style={{
+                    position: 'fixed',
+                    bottom: '16px',
+                    left: '16px',
+                    width: 'auto',
+                    minWidth: 'auto',
+                    borderRadius: '24px',
+                    padding: '8px 16px'
+                }}
+            >
+                Log Out
             </Button>
 
             {/* Create Project Dialog */}
