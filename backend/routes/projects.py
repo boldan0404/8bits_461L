@@ -112,7 +112,7 @@ def checkout_hw(name, set_name):
     hwset = project["hardware_sets"].get(set_name)
     if not hwset or hwset["available"] < qty:
         return jsonify({"error": "Not enough hardware available",
-                        "message" : f"Attempted to checkout too many from set: {hwset}"}), 400
+                        "message" : f"Attempted to checkout too many from set: {set_name}"}), 400
 
     db.projects.update_one(
         {"name": name},
