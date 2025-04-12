@@ -31,7 +31,7 @@ function Projects() {
     useEffect(() => {
         async function fetchProjects() {
             try {
-                const response = await fetch(`${API_BASE_URL}/projects`, {
+                const response = await fetch(`/projects`, {
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -77,7 +77,7 @@ function Projects() {
 
     useEffect(() => {
         async function fetchHwsets() {
-            const response = await fetch(`${API_BASE_URL}/projects/hwsets`, {
+            const response = await fetch(`/projects/hwsets`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 },
@@ -152,7 +152,7 @@ function Projects() {
         try {
             const hardware_sets = selectedHwsetIds;
 
-            const response = await fetch(`${API_BASE_URL}/projects`, {
+            const response = await fetch(`/projects`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -171,7 +171,7 @@ function Projects() {
             }
 
             // ✅ Only one refresh, not duplicated
-            const newResponse = await fetch(`${API_BASE_URL}/projects`, {
+            const newResponse = await fetch(`/projects`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }

@@ -34,7 +34,7 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
         const selectedSet = hardwareSets[selectedHardwareSet];
         const hwsetId = selectedSet.hwset_id;
 
-        const url = `${API_BASE_URL}/projects/${projectName}/hwsets/${hwsetId}/checkin`;
+        const url = `/projects/${projectName}/hwsets/${hwsetId}/checkin`;
 
         try {
             const response = await fetch(url, {
@@ -67,7 +67,7 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
         const selectedSet = hardwareSets[selectedHardwareSet];
         const hwsetId = selectedSet.hwset_id;  // Use the object property, not .split()
 
-        const url = `${API_BASE_URL}/projects/${projectName}/hwsets/${hwsetId}/checkout`;
+        const url = `/projects/${projectName}/hwsets/${hwsetId}/checkout`;
 
         try {
             const response = await fetch(url, {
@@ -96,7 +96,7 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
     const handleJoinLeave = async () => {
         const projectName = name;
         const endpoint = joined ? 'leave' : 'join';
-        const url = `${API_BASE_URL}/projects/${projectName}/${endpoint}`;
+        const url = `$/projects/${projectName}/${endpoint}`;
         try {
             const response = await fetch(url, {
                 method: 'POST',
