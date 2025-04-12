@@ -7,7 +7,7 @@ from routes import all_blueprints
 import os
 from flask import send_from_directory
 
-react_build_dir = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'login-app', 'build')
+react_build_dir = os.path.join(os.path.dirname(__file__), 'build')
 static_dir = os.path.join(react_build_dir, 'static')
 app = Flask(__name__,static_folder=static_dir)
 
