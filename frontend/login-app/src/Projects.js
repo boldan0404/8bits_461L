@@ -7,9 +7,11 @@ import {
     DialogContent,
     DialogActions,
     TextField,
-    Typography
+    Typography,
+    FormGroup, FormControlLabel, Checkbox
 } from '@mui/material';
 import { Add } from '@mui/icons-material';
+
 
 const API_BASE_URL = "http://127.0.0.1:5000";
 
@@ -21,8 +23,9 @@ function Projects() {
     // State for Create Project dialog
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [projectName, setProjectName] = useState("");
-    const [hwSetName, setHwSetName] = useState("");
-    const [hwSetCapacity, setHwSetCapacity] = useState("");
+    const [projectDescription, setProjectDescription] = useState("");
+    const [availableHwsets, setAvailableHwsets] = useState([]);
+    const [selectedHwsetIds, setSelectedHwsetIds] = useState([]);
 
     // Fetch projects from your Flask backend on mount
     useEffect(() => {
@@ -31,7 +34,7 @@ function Projects() {
                 const response = await fetch(`${API_BASE_URL}/projects`, {
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`, // JWT token if required
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     },
                 });
 
@@ -39,23 +42,21 @@ function Projects() {
                     throw new Error('Failed to fetch projects');
                 }
 
-                // The backend returns an array of project documents
                 const data = await response.json();
+                const username = localStorage.getItem('username');
 
-                // Transform each project to match what your UI expects
-                const username = localStorage.getItem('username'); // if you store the logged-in username
                 const transformedProjects = data.map((project, index) => {
-                    let hardwareSets = [];
-                    if (project.hardware_sets) {
-                        hardwareSets = Object.entries(project.hardware_sets).map(([setName, setData]) => {
-                            const { available, capacity } = setData;
-                            return `${setName}: ${available}/${capacity}`;
-                        });
-                    }
+                    const hardwareSets = (project.hwsets || []).map(hw => ({
+                        hwset_id: hw.hwset_id,
+                        name: hw.name,
+                        available: hw.available ?? 0,
+                        capacity: hw.capacity ?? 0,
+                    }));
 
                     return {
-                        id: project._id?.$oid || index,
+                        id: project._id || index,
                         name: project.name,
+                        description: project.description || "",
                         hardwareSets: hardwareSets,
                         authorizedUsers: project.authorized_users || [],
                         joined: (project.authorized_users || []).includes(username),
@@ -73,6 +74,29 @@ function Projects() {
         fetchProjects();
     }, []);
 
+
+    useEffect(() => {
+        async function fetchHwsets() {
+            const response = await fetch(`${API_BASE_URL}/projects/hwsets`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                },
+            });
+            const data = await response.json();
+            setAvailableHwsets(data);
+        }
+        if (createDialogOpen) fetchHwsets();
+    }, [createDialogOpen]);
+
+    const handleToggleHwset = (id) => {
+        const stringId = id.toString(); // ensure consistency
+        setSelectedHwsetIds(prev =>
+            prev.includes(stringId)
+                ? prev.filter(hid => hid !== stringId)
+                : [...prev, stringId]
+        );
+    };
+
     const handleToggleJoin = (projectId) => {
         setProjects(prevProjects =>
             prevProjects.map(proj =>
@@ -89,15 +113,25 @@ function Projects() {
 
                 const updatedHardwareSets = project.hardwareSets.map((setString, index) => {
                     if (index !== hardwareSetIndex) return setString;
-                    const [label, numbers] = setString.split(':').map(s => s.trim());
-                    let [current, total] = numbers.split('/').map(Number);
+
+                    const label = setString.name || `HWSet ${index + 1}`;
+                    let current = setString.available ?? 0;
+                    let total = setString.capacity ?? 0;
+
                     if (type === 'checkin') {
                         current = Math.min(total, current + qty);
                     } else if (type === 'checkout') {
                         current = Math.max(0, current - qty);
                     }
-                    return `${label}: ${current}/${total}`;
+
+                    return {
+                        ...setString,
+                        available: current,
+                        name: label,
+                        capacity: total
+                    };
                 });
+
 
                 return { ...project, hardwareSets: updatedHardwareSets };
             })
@@ -111,31 +145,23 @@ function Projects() {
 
     const closeCreateDialog = () => {
         setProjectName("");
-        setHwSetName("");
-        setHwSetCapacity("");
         setCreateDialogOpen(false);
     };
 
     const handleCreateProject = async () => {
         try {
-            // Build hardware_sets object from dialog fields (for one hardware set)
-            const hardwareSets = {};
-            if (hwSetName && hwSetCapacity) {
-                hardwareSets[hwSetName] = {
-                    available: 0,
-                    capacity: parseInt(hwSetCapacity, 10)
-                };
-            }
+            const hardware_sets = selectedHwsetIds;
 
             const response = await fetch(`${API_BASE_URL}/projects`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 },
                 body: JSON.stringify({
                     name: projectName,
-                    hardware_sets: hardwareSets
+                    description: projectDescription,
+                    hardware_sets: hardware_sets
                 })
             });
 
@@ -144,38 +170,56 @@ function Projects() {
                 throw new Error(errMsg.error || 'Error creating project');
             }
 
-            // On success, close dialog and refresh the project list
-            closeCreateDialog();
+            // ✅ Only one refresh, not duplicated
             const newResponse = await fetch(`${API_BASE_URL}/projects`, {
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
+                }
             });
             const newData = await newResponse.json();
             const username = localStorage.getItem('username');
+
             const transformedProjects = newData.map((project, index) => {
                 let hardwareSets = [];
-                if (project.hardware_sets) {
+
+                // ✅ Safely check for both keys
+                if (project.hwsets) {
+                    hardwareSets = project.hwsets.map(hw => {
+                        const label = hw.name || hw.hwset_id;
+                        const available = hw.available ?? 0;
+                        const capacity = hw.capacity ?? 0;
+                        return `${label}: ${available}/${capacity}`;
+                    });
+                } else if (project.hardware_sets) {
                     hardwareSets = Object.entries(project.hardware_sets).map(([setName, setData]) => {
                         const { available, capacity } = setData;
                         return `${setName}: ${available}/${capacity}`;
                     });
                 }
+
                 return {
                     id: project._id?.$oid || index,
                     name: project.name,
-                    hardwareSets: hardwareSets,
+                    hardwareSets,
                     authorizedUsers: project.authorized_users || [],
                     joined: (project.authorized_users || []).includes(username),
                 };
             });
+
             setProjects(transformedProjects);
+
+            // ✅ Clear state and close dialog
+            setCreateDialogOpen(false);
+            setProjectName("");
+            setProjectDescription("");
+            setSelectedHwsetIds([]);
+
         } catch (error) {
             console.error("Failed to create project:", error);
             alert(error.message);
         }
     };
+
 
     // --------------- Log Out Handler ---------------
     const handleLogout = () => {
@@ -192,6 +236,7 @@ function Projects() {
     if (error) {
         return <div>Error: {error}</div>;
     }
+
 
     return (
         <div style={{ position: 'relative', minHeight: '100vh' }}>
@@ -263,19 +308,30 @@ function Projects() {
                     />
                     <TextField
                         margin="dense"
-                        label="Hardware Set Name"
+                        label="Project Description"
                         fullWidth
-                        value={hwSetName}
-                        onChange={(e) => setHwSetName(e.target.value)}
+                        value={projectDescription}
+                        onChange={(e) => setProjectDescription(e.target.value)}
                     />
-                    <TextField
-                        margin="dense"
-                        label="Hardware Set Capacity"
-                        type="number"
-                        fullWidth
-                        value={hwSetCapacity}
-                        onChange={(e) => setHwSetCapacity(e.target.value)}
-                    />
+                    <Typography variant="subtitle1" mt={2}>Select Hardware Sets</Typography>
+                    <FormGroup>
+                        {availableHwsets.map(hw => {
+                            const hwId = typeof hw._id === 'object' ? hw._id.$oid || hw._id.toString() : hw._id;
+                            return (
+                                <FormControlLabel
+                                    key={hwId}
+                                    control={
+                                        <Checkbox
+                                            checked={selectedHwsetIds.includes(hwId)}
+                                            onChange={() => handleToggleHwset(hwId)}
+                                        />
+                                    }
+                                    label={`${hw.name} (Capacity: ${hw.capacity}, Available: ${hw.available})`}
+                                />
+                            );
+                        })}
+
+                    </FormGroup>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={closeCreateDialog}>Cancel</Button>

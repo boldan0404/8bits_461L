@@ -16,7 +16,7 @@ import {
 const API_BASE_URL = "http://127.0.0.1:5000";
 
 function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
-    const { id, name, hardwareSets, joined } = project;
+    const { id, name, hardwareSets, authorizedUsers, joined } = project;
     const [quantity, setQuantity] = useState(0);
     const [selectedHardwareSet, setSelectedHardwareSet] = useState(0); // default selection is the first hardware set
     const token = localStorage.getItem('token');
@@ -31,18 +31,12 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
 
     const handleCheckIn = async () => {
         const projectName = name;
-        const hwSetName = hardwareSets[selectedHardwareSet].split(':')[0]; // extract hardware set name
-        const url = `${API_BASE_URL}/projects/${projectName}/hwsets/${hwSetName}/checkin`;
+        const selectedSet = hardwareSets[selectedHardwareSet]; // This is an object now
+        const hwsetId = selectedSet.hwset_id;
+    
+        const url = `${API_BASE_URL}/projects/${projectName}/hwsets/${hwsetId}/checkin`;
+    
         try {
-            // const response = await fetch(url, {
-            //     method: "POST",
-            //     headers: {
-            //         "Content-Type": "application/json",
-            //         "Authorization": `Bearer ${token}`
-            //     },
-            //     body: JSON.stringify({ qty: quantity })
-            // });
-
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -50,23 +44,27 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 },
                 body: JSON.stringify({
-                    hardware_sets: hardwareSets,
                     qty: quantity,
                 })
             });
+    
             const data = await response.json();
             alert(data.message);
+    
+            // Update local state
             onCheckIn(id, selectedHardwareSet, quantity);
         } catch (error) {
             console.error("Error checking in hardware:", error);
         }
     };
-
+    
     const handleCheckOut = async () => {
         const projectName = name;
-        console.log("checkout project name:", projectName);
-        const hwSetName = hardwareSets[selectedHardwareSet].split(':')[0];
-        const url = `${API_BASE_URL}/projects/${projectName}/hwsets/${hwSetName}/checkout`;
+        const selectedSet = hardwareSets[selectedHardwareSet];
+        const hwsetId = selectedSet.hwset_id;  // Use the object property, not .split()
+
+        const url = `${API_BASE_URL}/projects/${projectName}/hwsets/${hwsetId}/checkout`;
+
         try {
             const response = await fetch(url, {
                 method: 'POST',
@@ -85,6 +83,7 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
             console.error("Error checking out hardware:", error);
         }
     };
+
 
     const handleJoinLeave = async () => {
         const projectName = name;
@@ -122,20 +121,35 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
                         onChange={handleHardwareSetChange}
                     >
                         {hardwareSets.map((set, index) => {
-                            const label = set.split(':')[0];
+                            console.log(`Rendering set ${index}:`, set);
                             return (
                                 <MenuItem key={index} value={index}>
-                                    {label}
+                                    {set.name || `HWSet ${index + 1}`}
                                 </MenuItem>
                             );
                         })}
+
                     </Select>
                 </FormControl>
 
                 {/* Optionally display details for the selected hardware set */}
-                <Typography variant="body2">
-                    {hardwareSets[selectedHardwareSet]}
-                </Typography>
+                {hardwareSets[selectedHardwareSet] && (
+                    <div style={{
+                        marginTop: '4px',
+                        backgroundColor: '#f5f5f5',
+                        borderRadius: '6px',
+                        padding: '4px 8px',
+                        fontSize: '0.75rem',
+                        color: '#666'
+                    }}>
+                        <Typography variant="body2">
+                            {hardwareSets[selectedHardwareSet].available ?? 0} / {hardwareSets[selectedHardwareSet].capacity ?? 0}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 1 }}>
+                            <strong>Authorized Users:</strong> {authorizedUsers.join(', ')}
+                        </Typography>
+                    </div>
+                )}
 
                 <div style={{ marginTop: '16px' }}>
                     <TextField
