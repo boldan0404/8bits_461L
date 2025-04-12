@@ -239,13 +239,16 @@ function Projects() {
 
 
     return (
-        <div style={{ position: 'relative', minHeight: '100vh' }}>
+        <div style={{
+            marginTop: '50px',  // or marginTop: '64px'
+            minHeight: '100vh',
+        }}>
             <Typography variant="h4" style={{ marginBottom: '16px' }}>
                 Projects
             </Typography>
-            {projects.map((proj) => (
+            {projects.map((proj, index) => (
+            <div key={proj.id} className={index === 0 ? 'first-project-card' : ''}>
                 <ProjectCard
-                    key={proj.id}
                     project={proj}
                     onToggleJoin={handleToggleJoin}
                     onCheckIn={(projectId, hardwareSetIndex, qty) =>
@@ -255,7 +258,8 @@ function Projects() {
                         handleHardwareUpdate(projectId, hardwareSetIndex, qty, 'checkout')
                     }
                 />
-            ))}
+            </div>
+        ))}
 
             {/* Floating "Create Project" Button (Bottom Right) */}
             <Button
