@@ -92,6 +92,19 @@ def create_project():
     db.projects.insert_one(new_project)
     return jsonify({"message": f"Project '{project_name}' created"}), 201
 
+# GET global hardware
+@projects.route("/projects/<hwset_id>", methods=["POST"])
+@jwt_required()
+def get_hardware(hwset_id):
+    db = current_app.db
+    object_id = ObjectId(hwset_id)
+    hwset = db['hwsets'].find_one({"_id": object_id})
+
+    if hwset is None:
+        return jsonify({"error": f"HWSet with the id: {hwset_id} was not found"}), 404
+    return jsonify(hwset), 200
+
+
 # POST check in hardware
 @projects.route("/projects/<name>/hwsets/<hwset_id>/checkin", methods=["POST"])
 @jwt_required()
