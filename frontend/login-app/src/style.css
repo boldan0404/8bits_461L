@@ -46,3 +46,6 @@ button {
 button:hover {
     background-color: #0056b3;
 }
+.first-project-card {
+    margin-top: 500px; /* or any other value */
+}
