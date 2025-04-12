@@ -31,11 +31,11 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
 
     const handleCheckIn = async () => {
         const projectName = name;
-        const selectedSet = hardwareSets[selectedHardwareSet]; // This is an object now
+        const selectedSet = hardwareSets[selectedHardwareSet];
         const hwsetId = selectedSet.hwset_id;
-    
+
         const url = `${API_BASE_URL}/projects/${projectName}/hwsets/${hwsetId}/checkin`;
-    
+
         try {
             const response = await fetch(url, {
                 method: 'POST',
@@ -47,17 +47,21 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
                     qty: quantity,
                 })
             });
-    
+
             const data = await response.json();
+            if (!response.ok) {
+                alert(data.error || "Checkin failed");
+                return;
+            }
             alert(data.message);
-    
+
             // Update local state
             onCheckIn(id, selectedHardwareSet, quantity);
         } catch (error) {
             console.error("Error checking in hardware:", error);
         }
     };
-    
+
     const handleCheckOut = async () => {
         const projectName = name;
         const selectedSet = hardwareSets[selectedHardwareSet];
@@ -77,6 +81,10 @@ function ProjectCard({ project, onToggleJoin, onCheckIn, onCheckOut }) {
                 })
             });
             const data = await response.json();
+            if (!response.ok) {
+                alert(data.error || "Checkout failed");
+                return;
+            }
             alert(data.message);
             onCheckOut(id, selectedHardwareSet, quantity);
         } catch (error) {
