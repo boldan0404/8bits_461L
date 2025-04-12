@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ProjectCard from './ProjectCard';
 import {
     Button,
@@ -8,10 +8,11 @@ import {
     DialogActions,
     TextField,
     Typography,
-    FormGroup, FormControlLabel, Checkbox
+    FormGroup,
+    FormControlLabel,
+    Checkbox
 } from '@mui/material';
 import { Add } from '@mui/icons-material';
-
 
 const API_BASE_URL = "http://127.0.0.1:5000";
 
@@ -27,69 +28,76 @@ function Projects() {
     const [availableHwsets, setAvailableHwsets] = useState([]);
     const [selectedHwsetIds, setSelectedHwsetIds] = useState([]);
 
-    // Fetch projects from your Flask backend on mount
-    useEffect(() => {
-        async function fetchProjects() {
-            try {
-                const response = await fetch(`/projects`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    },
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to fetch projects');
+    // Define fetchProjects as a reusable function using useCallback
+    const fetchProjects = useCallback(async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/projects`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 }
-
-                const data = await response.json();
-                const username = localStorage.getItem('username');
-
-                const transformedProjects = data.map((project, index) => {
-                    const hardwareSets = (project.hwsets || []).map(hw => ({
-                        hwset_id: hw.hwset_id,
-                        name: hw.name,
-                        available: hw.available ?? 0,
-                        capacity: hw.capacity ?? 0,
-                    }));
-
-                    return {
-                        id: project._id || index,
-                        name: project.name,
-                        description: project.description || "",
-                        hardwareSets: hardwareSets,
-                        authorizedUsers: project.authorized_users || [],
-                        joined: (project.authorized_users || []).includes(username),
-                    };
-                });
-
-                setProjects(transformedProjects);
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
+            });
+            if (!response.ok) {
+                throw new Error('Failed to fetch projects');
             }
-        }
+            const data = await response.json();
+            const username = localStorage.getItem('username');
 
-        fetchProjects();
+            const transformedProjects = data.map((project) => {
+                // Map the joined hwset details from the backend (using the field "hwsets")
+                const hardwareSets = (project.hwsets || []).map(hw => ({
+                    hwset_id: hw.hwset_id,
+                    name: hw.name,
+                    available: hw.available ?? 0,
+                    capacity: hw.capacity ?? 0,
+                }));
+
+                return {
+                    id: project._id || project.id, // backend already converts _id to string
+                    name: project.name,
+                    description: project.description || "",
+                    hardwareSets: hardwareSets,
+                    authorizedUsers: project.authorized_users || [],
+                    joined: (project.authorized_users || []).includes(username)
+                };
+            });
+
+            setProjects(transformedProjects);
+            setError(null);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
+    // Initial fetch and polling every 5 seconds
+    useEffect(() => {
+        fetchProjects(); // initial load
+        const intervalId = setInterval(fetchProjects, 5000);
+        return () => clearInterval(intervalId);
+    }, [fetchProjects]);
 
+    // Fetch global hardware sets when the Create Project dialog is open
     useEffect(() => {
         async function fetchHwsets() {
-            const response = await fetch(`/projects/hwsets`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                },
-            });
-            const data = await response.json();
-            setAvailableHwsets(data);
+            try {
+                const response = await fetch(`${API_BASE_URL}/projects/hwsets`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    }
+                });
+                const data = await response.json();
+                setAvailableHwsets(data);
+            } catch (err) {
+                console.error("Error fetching hwsets:", err);
+            }
         }
         if (createDialogOpen) fetchHwsets();
     }, [createDialogOpen]);
 
     const handleToggleHwset = (id) => {
-        const stringId = id.toString(); // ensure consistency
+        const stringId = id.toString();
         setSelectedHwsetIds(prev =>
             prev.includes(stringId)
                 ? prev.filter(hid => hid !== stringId)
@@ -97,45 +105,9 @@ function Projects() {
         );
     };
 
-    const handleToggleJoin = (projectId) => {
-        setProjects(prevProjects =>
-            prevProjects.map(proj =>
-                proj.id === projectId ? { ...proj, joined: !proj.joined } : proj
-            )
-        );
-    };
-
-    // This updates the hardwareSets array in local state after check-in/check-out
-    const handleHardwareUpdate = (projectId, hardwareSetIndex, qty, type) => {
-        setProjects(prevProjects =>
-            prevProjects.map(project => {
-                if (project.id !== projectId) return project;
-
-                const updatedHardwareSets = project.hardwareSets.map((setString, index) => {
-                    if (index !== hardwareSetIndex) return setString;
-
-                    const label = setString.name || `HWSet ${index + 1}`;
-                    let current = setString.available ?? 0;
-                    let total = setString.capacity ?? 0;
-
-                    if (type === 'checkin') {
-                        current = Math.min(total, current + qty);
-                    } else if (type === 'checkout') {
-                        current = Math.max(0, current - qty);
-                    }
-
-                    return {
-                        ...setString,
-                        available: current,
-                        name: label,
-                        capacity: total
-                    };
-                });
-
-
-                return { ...project, hardwareSets: updatedHardwareSets };
-            })
-        );
+    // Use fetchProjects() as the callback for join/leave and checkin/checkout actions
+    const handleToggleJoin = async () => {
+        await fetchProjects();
     };
 
     // --------------- Create Project Dialog Handlers ---------------
@@ -145,14 +117,18 @@ function Projects() {
 
     const closeCreateDialog = () => {
         setProjectName("");
+        setProjectDescription("");
+        setSelectedHwsetIds([]);
         setCreateDialogOpen(false);
     };
 
     const handleCreateProject = async () => {
         try {
+            // For now, send selectedHwsetIds (list of string IDs) as hardware_sets.
+            // (Ensure your backend expects this format and performs necessary lookups.)
             const hardware_sets = selectedHwsetIds;
 
-            const response = await fetch(`/projects`, {
+            const response = await fetch(`${API_BASE_URL}/projects`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -161,7 +137,7 @@ function Projects() {
                 body: JSON.stringify({
                     name: projectName,
                     description: projectDescription,
-                    hardware_sets: hardware_sets
+                    hardware_sets
                 })
             });
 
@@ -170,63 +146,21 @@ function Projects() {
                 throw new Error(errMsg.error || 'Error creating project');
             }
 
-            // ✅ Only one refresh, not duplicated
-            const newResponse = await fetch(`/projects`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-            const newData = await newResponse.json();
-            const username = localStorage.getItem('username');
+            // Refresh the projects list after creation
+            await fetchProjects();
 
-            const transformedProjects = newData.map((project, index) => {
-                let hardwareSets = [];
-
-                // ✅ Safely check for both keys
-                if (project.hwsets) {
-                    hardwareSets = project.hwsets.map(hw => {
-                        const label = hw.name || hw.hwset_id;
-                        const available = hw.available ?? 0;
-                        const capacity = hw.capacity ?? 0;
-                        return `${label}: ${available}/${capacity}`;
-                    });
-                } else if (project.hardware_sets) {
-                    hardwareSets = Object.entries(project.hardware_sets).map(([setName, setData]) => {
-                        const { available, capacity } = setData;
-                        return `${setName}: ${available}/${capacity}`;
-                    });
-                }
-
-                return {
-                    id: project._id?.$oid || index,
-                    name: project.name,
-                    hardwareSets,
-                    authorizedUsers: project.authorized_users || [],
-                    joined: (project.authorized_users || []).includes(username),
-                };
-            });
-
-            setProjects(transformedProjects);
-
-            // ✅ Clear state and close dialog
-            setCreateDialogOpen(false);
-            setProjectName("");
-            setProjectDescription("");
-            setSelectedHwsetIds([]);
-
+            // Clear state and close dialog
+            closeCreateDialog();
         } catch (error) {
             console.error("Failed to create project:", error);
             alert(error.message);
         }
     };
 
-
     // --------------- Log Out Handler ---------------
     const handleLogout = () => {
-        // Remove token and username from local storage
         localStorage.removeItem('token');
         localStorage.removeItem('username');
-        // Redirect to homepage
         window.location.href = '/';
     };
 
@@ -237,29 +171,22 @@ function Projects() {
         return <div>Error: {error}</div>;
     }
 
-
     return (
-        <div style={{
-            marginTop: '50px',  // or marginTop: '64px'
-            minHeight: '100vh',
-        }}>
+        <div style={{ marginTop: '50px', minHeight: '100vh' }}>
             <Typography variant="h4" style={{ marginBottom: '16px' }}>
                 Projects
             </Typography>
+
             {projects.map((proj, index) => (
-            <div key={proj.id} className={index === 0 ? 'first-project-card' : ''}>
-                <ProjectCard
-                    project={proj}
-                    onToggleJoin={handleToggleJoin}
-                    onCheckIn={(projectId, hardwareSetIndex, qty) =>
-                        handleHardwareUpdate(projectId, hardwareSetIndex, qty, 'checkin')
-                    }
-                    onCheckOut={(projectId, hardwareSetIndex, qty) =>
-                        handleHardwareUpdate(projectId, hardwareSetIndex, qty, 'checkout')
-                    }
-                />
-            </div>
-        ))}
+                <div key={proj.id} style={{ marginTop: index === 0 ? '50px' : '0' }}>
+                    <ProjectCard
+                        project={proj}
+                        onToggleJoin={async () => { await fetchProjects(); }}
+                        onCheckIn={async () => { await fetchProjects(); }}
+                        onCheckOut={async () => { await fetchProjects(); }}
+                    />
+                </div>
+            ))}
 
             {/* Floating "Create Project" Button (Bottom Right) */}
             <Button
@@ -317,10 +244,14 @@ function Projects() {
                         value={projectDescription}
                         onChange={(e) => setProjectDescription(e.target.value)}
                     />
-                    <Typography variant="subtitle1" mt={2}>Select Hardware Sets</Typography>
+                    <Typography variant="subtitle1" mt={2}>
+                        Select Hardware Sets
+                    </Typography>
                     <FormGroup>
                         {availableHwsets.map(hw => {
-                            const hwId = typeof hw._id === 'object' ? hw._id.$oid || hw._id.toString() : hw._id;
+                            const hwId = typeof hw._id === 'object'
+                                ? hw._id.$oid || hw._id.toString()
+                                : hw._id;
                             return (
                                 <FormControlLabel
                                     key={hwId}
@@ -334,7 +265,6 @@ function Projects() {
                                 />
                             );
                         })}
-
                     </FormGroup>
                 </DialogContent>
                 <DialogActions>
